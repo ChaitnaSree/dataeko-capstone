@@ -73,7 +73,7 @@ def validate(row):
     except ValueError:
         return False, "ordered_at must be a valid ISO datetime"
 
-    allowed_statuses = {"placed", "preparing", "ready", "completed", "cancelled"}
+    allowed_statuses = {"placed", "ready", "collected", "cancelled"}
 
     if row["status"] not in allowed_statuses:
         return False, f"invalid status: {row['status']}"
