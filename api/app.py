@@ -9,7 +9,7 @@ import time
 from collections import defaultdict, deque
 import psycopg
 from flask import Flask, jsonify, request
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 from api.config import DB_DSN, PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX
 
@@ -29,8 +29,10 @@ LATENCY = Histogram(
     ["endpoint"],
 )
 
-# TODO (Phase 4): add a Gauge called capstone_orders_in_flight.
-
+ORDERS_IN_FLIGHT = Gauge(
+    "capstone_orders_in_flight",
+    "Number of HTTP requests currently being processed",
+)
 
 def db():
     return psycopg.connect(os.environ.get("DB_DSN", DB_DSN))
@@ -91,6 +93,8 @@ def orders():
             {"Retry-After": str(retry_after)},
         )
 
+    ORDERS_IN_FLIGHT.inc()
+
     try:
         page = max(1, request.args.get("page", 1, type=int))
         per_page = request.args.get(
@@ -132,7 +136,7 @@ def orders():
             }
             for row in rows
         ]
-
+        REQUESTS.labels("/orders", "GET", 200).inc()
         return jsonify(
             count=len(results),
             total=total,
@@ -142,6 +146,7 @@ def orders():
         )
 
     finally:
+        ORDERS_IN_FLIGHT.dec()
         LATENCY.labels("/orders").observe(time.time() - start)
 
 
